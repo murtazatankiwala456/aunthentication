@@ -2,6 +2,8 @@ import "dotenv/config";
 import express from "express";
 import bodyParser from "body-parser";
 import mongoose, { Schema } from "mongoose";
+import bcrypt from "bcrypt";
+const saltRounds = 10;
 
 import md5 from "md5";
 
@@ -31,29 +33,33 @@ app.get("/register", (req, res) => {
 });
 
 app.post("/register", (req, res) => {
-  const newUser = new User({
-    email: req.body.username,
-    password: md5(req.body.password),
+  bcrypt.hash(req.body.password, saltRounds, (err, hash) => {
+    const newUser = new User({
+      email: req.body.username,
+      password: hash,
+    });
+    newUser.save();
+    res.render("secrets.ejs");
   });
-  newUser.save();
-  res.render("secrets.ejs");
 });
 
 app.post("/login", async (req, res) => {
   try {
     const username = req.body.username;
-    const password = md5(req.body.password);
+    const password = req.body.password;
 
     const findUser = await User.findOne({ email: username });
     if (findUser) {
-      if (findUser.password === password) {
-        res.render("secrets.ejs");
-      }
-    } else {
-      res.send("Incorrect crendentials!");
+      bcrypt.compare(password, findUser.password, (err, result) => {
+        if (result === true) {
+          res.render("secrets.ejs");
+        } else {
+          res.send("Incorrect credentials!");
+        }
+      });
     }
   } catch (error) {
-    res.send(error, "User not found");
+    console.error(error);
   }
 });
 
